@@ -1,7 +1,41 @@
+"""
+arXiv Research Paper Management Server
+
+This module implements a Model Context Protocol (MCP) server that provides tools and resources
+for searching, storing, and managing academic papers from arXiv. It offers functionality to:
+- Search for papers by topic
+- Store paper metadata in a structured format
+- Extract paper information
+- Browse papers by research topics
+- Generate research summaries
+
+The server uses FastMCP to expose its functionality and organizes papers into topic-based
+directories, storing metadata in JSON format.
+
+Features:
+    - arXiv integration for paper searches
+    - Topic-based paper organization
+    - JSON-based metadata storage
+    - Markdown-formatted paper listings
+    - Paper information extraction
+    - Research summary generation
+
+Dependencies:
+    - arxiv: For accessing the arXiv API
+    - mcp.server.fastmcp: For MCP server implementation
+    - json: For metadata storage
+    - os: For file system operations
+
+Directory Structure:
+    papers/
+        topic_name/
+            papers_info.json
+"""
+
 import arxiv
 import json
 import os
-from typing import List
+from typing import List, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
 # Initialize FastMCP server
@@ -10,8 +44,18 @@ mcp = FastMCP("research")
 
 PAPER_DIR = "papers"
 
+
 @mcp.resource("papers://folders")
 def get_available_folders() -> str:
+    """
+    List all available research topic folders and format them as a markdown list.
+    
+    Returns:
+        str: Markdown-formatted string containing:
+            - List of available research topics
+            - Instructions for accessing papers in a topic
+            - Message if no topics are available
+    """
     folders = []
 
     if os.path.exists(PAPER_DIR):
@@ -34,6 +78,27 @@ def get_available_folders() -> str:
 
 @mcp.resource("papers://{topic}")
 def get_topic_papers(topic: str) -> str:
+    """
+    Retrieve and format information about all papers in a specific topic.
+    
+    Args:
+        topic: The research topic to retrieve papers for
+        
+    Returns:
+        str: Markdown-formatted string containing:
+            - Topic title
+            - Total number of papers
+            - Detailed information for each paper including:
+                - Title
+                - Paper ID
+                - Authors
+                - Publication date
+                - PDF URL
+                - Summary
+                
+    Note:
+        Papers are stored in topic-specific directories with metadata in papers_info.json
+    """
     PAPER_TEMPLATE="""
 ## {title}
 - **Paper ID**: {id}
@@ -69,7 +134,25 @@ def get_topic_papers(topic: str) -> str:
     
 
 @mcp.prompt()
-def generate_search_prompt(topic: str, num_papers: int=5) -> str:
+def generate_search_prompt(topic: str, num_papers: int = 5) -> str:
+    """
+    Generate a detailed prompt for searching and analyzing papers on a specific topic.
+    
+    This function creates a structured prompt that guides the search process and
+    subsequent analysis of academic papers, ensuring comprehensive coverage of the
+    research landscape.
+    
+    Args:
+        topic: The research topic to investigate
+        num_papers: Number of papers to include in the analysis (default: 5)
+        
+    Returns:
+        str: A detailed prompt string that includes:
+            - Search instructions
+            - Analysis requirements
+            - Summary structure guidelines
+            - Synthesis requirements
+    """
     return f"""Search for {num_papers} academic papers about '{topic}' using the search_papers tool. Follow these instructions:
     1. First, search for papers using search_papers(topic='{topic}', max_results={num_papers})
     2. For each paper found, extract and organize the following information:
@@ -98,13 +181,26 @@ def generate_search_prompt(topic: str, num_papers: int=5) -> str:
 def search_papers(topic: str, max_results: int = 5) -> List[str]:
     """
     Search for papers on arXiv based on a topic and store their information.
-
+    
+    This function searches arXiv for papers matching the given topic, downloads
+    their metadata, and stores it in a topic-specific JSON file. It creates
+    the necessary directory structure if it doesn't exist.
+    
     Args:
-        topic: The topic to search for
-        max_results: Maximum number of results to retrieve (default: 5)
-
+        topic: The topic to search for papers about
+        max_results: Maximum number of papers to retrieve (default: 5)
+        
     Returns:
-        List of paper IDs found in the search
+        List[str]: List of arXiv paper IDs found in the search
+        
+    Note:
+        Papers are stored in: papers/<topic>/papers_info.json
+        Each paper's metadata includes:
+            - Title
+            - Authors
+            - Summary
+            - PDF URL
+            - Publication date
     """
 
     # Use arxiv to find the papers
@@ -154,13 +250,21 @@ def search_papers(topic: str, max_results: int = 5) -> List[str]:
 @mcp.tool()
 def extract_info(paper_id: str) -> str:
     """
-    Search for information about a specific paper across all topic directories.
+    Search for and extract information about a specific paper across all topics.
+    
+    This function searches through all topic directories to find metadata about
+    a specific paper identified by its arXiv ID.
     
     Args:
-        paper_id: The ID of the paper to look for
+        paper_id: The arXiv ID of the paper to look for
         
     Returns:
-        JSON string with paper information if found, error message if not found
+        str: JSON-formatted string containing the paper's metadata if found,
+             or an error message if the paper is not found
+        
+    Note:
+        The function searches all topic directories as a paper might be
+        referenced in multiple research topics.
     """
  
     for item in os.listdir(PAPER_DIR):
@@ -220,7 +324,24 @@ mapping_tool_function = {
     "extract_info": extract_info
 }
 
-def execute_tool(tool_name, tool_args):
+def execute_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
+    """
+    Execute a tool by name with the provided arguments.
+    
+    This function serves as a dispatcher for tool execution, handling various
+    return types and formatting the output appropriately.
+    
+    Args:
+        tool_name: Name of the tool to execute
+        tool_args: Dictionary of arguments to pass to the tool
+        
+    Returns:
+        str: Formatted result of the tool execution:
+            - For None: Message indicating completion
+            - For lists: Comma-separated string
+            - For dicts: Formatted JSON string
+            - For other types: String representation
+    """
     
     result = mapping_tool_function[tool_name](**tool_args)
 
