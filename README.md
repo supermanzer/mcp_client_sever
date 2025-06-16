@@ -50,17 +50,12 @@ An intelligent research assistant that combines the Model Context Protocol (MCP)
 
 ## Usage
 
-1. Start the MCP server:
-   ```bash
-   python server.py
-   ```
-
-2. In a separate terminal, start the client:
+1. Start the client (the server will start automatically):
    ```bash
    python client.py
    ```
 
-3. Interact with the chatbot using natural language queries. Examples:
+2. Interact with the chatbot using natural language queries. Examples:
    - "Search for papers about quantum computing"
    - "Show me available research topics"
    - "Get information about paper [paper_id]"
