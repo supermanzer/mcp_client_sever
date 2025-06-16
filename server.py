@@ -10,6 +10,90 @@ mcp = FastMCP("research")
 
 PAPER_DIR = "papers"
 
+@mcp.resource("papers://folders")
+def get_available_folders() -> str:
+    folders = []
+
+    if os.path.exists(PAPER_DIR):
+        for topic_dir in os.listdir(PAPER_DIR):
+            topic_path = os.path.join(PAPER_DIR, topic_dir)
+            if os.path.isdir(topic_path):
+                papers_file = os.path.join(topic_path, 'papers_info.json')
+                if os.path.exists(papers_file):
+                    folders.append(topic_dir)
+
+    content = "# Available Topics\n\n"
+    if folders:
+        # Using join() with template strings to create a formatted list
+        content += '\n'.join(f'- {folder.replace("_", " ").title()}' for folder in folders)
+        content += f"\nUse @{folders[0]} to access papers in that topic.\n"
+    else:
+        content += "No research topics available yet."
+    
+    return content
+
+@mcp.resource("papers://{topic}")
+def get_topic_papers(topic: str) -> str:
+    PAPER_TEMPLATE="""
+## {title}
+- **Paper ID**: {id}
+- **Authors**: {authors}
+- **Publiished**: {published}
+- **PDF URL**: {pdf_url}
+### Summary
+{summary}
+"""
+    topic_dir = topic.lower().replace(" ", "_")
+    papers_file = os.path.join(PAPER_DIR, topic_dir, "papers_info.json")
+
+    if not os.path.exists(papers_file):
+        return f"# No papers found for topic: {topic}\nTry searching for papers on this topic"
+    try:
+        with open(papers_file, 'r') as f:
+            papers_data = json.load(f)
+        content = f"# Papers on {topic.replace('_', " ")}\n\nTotal papers: {len(papers_data)}\n\n"
+
+        for paper_id, paper_info, in papers_data.items():
+            content += PAPER_TEMPLATE.format(
+                title=paper_info.get('title', ''),
+                id=paper_id,
+                authors=', '.join(paper_info.get('authors',[])),
+                published=paper_info.get('published', ''),
+                pdf_url=paper_info.get('pdf_url', ''),
+                summary=paper_info.get('summary', '')
+            )
+            content += '\n\n'
+        return content
+    except json.JSONDecodeError:
+        return f"# Error reading papers data for {topic}\n\n.The file is corrupted"
+    
+
+@mcp.prompt()
+def generate_search_prompt(topic: str, num_papers: int=5) -> str:
+    return f"""Search for {num_papers} academic papers about '{topic}' using the search_papers tool. Follow these instructions:
+    1. First, search for papers using search_papers(topic='{topic}', max_results={num_papers})
+    2. For each paper found, extract and organize the following information:
+       - Paper title
+       - Authors
+       - Publication date
+       - Brief summary of the key findings
+       - Main contributions or innovations
+       - Methodologies used
+       - Relevance to the topic '{topic}'
+    
+    3. Provide a comprehensive summary that includes:
+       - Overview of the current state of research in '{topic}'
+       - Common themes and trends across the papers
+       - Key research gaps or areas for future investigation
+       - Most impactful or influential papers in this area
+    
+    4. Organize your findings in a clear, structured format with headings and bullet points for easy readability.
+    
+    Please present both detailed information about each paper and a high-level synthesis of the research landscape in {topic}."""
+
+
+
+
 @mcp.tool()
 def search_papers(topic: str, max_results: int = 5) -> List[str]:
     """
